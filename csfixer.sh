@@ -153,8 +153,8 @@ function fixvolume() {
     fi
     
     mount /dev/sdb4 i 
-    rm -rf i/Windows/System32/drivers/crowdstrike/c-00000291*.sys 2>>csfixer.log
-    rm -rf i/Windows/System32/drivers/crowdstrike/C-00000291*.sys 2>>csfixer.log
+    rm -rf i/Windows/System32/drivers/CrowdStrike/c-00000291*.sys 2>>csfixer.log
+    rm -rf i/Windows/System32/drivers/CrowdStrike/C-00000291*.sys 2>>csfixer.log
     umount i
 	echo -e "completed" 
 }
