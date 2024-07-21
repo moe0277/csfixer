@@ -9,5 +9,5 @@ PreReqs:
 
 Instructions: 
 1. Clone the code from github
-2. Modify the csfixer.ini file and enter a valid ocid 
+2. Modify the csfixer.ini file and enter a valid ocid (of the affected Windows compute instance - non-bitlocker)
 3. run ./csfixer.sh
