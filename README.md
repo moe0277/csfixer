@@ -1,2 +1,2 @@
 # csfixer
-CrowdStriker Fixer for OCI Windows Platform Images 
+CrowdStrike Bug Fixer for OCI Windows Platform Images 
