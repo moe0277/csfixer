@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# vim: tabstop=4 shiftwidth=4 softtabstop=4 expandtab nowrap:
 #
 # 
 # 
@@ -21,9 +22,20 @@ function intro() {
 
 function prereqs() { 
 	echo -en "Checking pre-reqs..."
-	#### if EPEL not enabled 
-	#### enable it... 
-	####
+	cat /etc/redhat-release | grep Ootpa &>csfixer.log
+	if [ "$?" != "0" ]; then
+		echo -e 
+		echo "ERROR: Not running on OL 8, aborting" 
+		exit 1
+	fi
+
+	yum-config-manager --enable ol8_baseos_latest ol8_appstream ol8_addons ol8_developer_EPEL &>>csfixer.log
+
+	if [ "$?" != "0" ]; then
+		echo -e "Error encountered..."
+		exit 1
+	fi
+
 	if ! yum list installed ntfs-3g &>>csfixer.log; then 
 		echo -e
 		echo -en "NOTE: Installing ntfs-3g..." 
@@ -38,12 +50,6 @@ function prereqs() {
 		echo -e "completed" 
 	fi
 
-	cat /etc/redhat-release | grep Ootpa &>csfixer.log
-	if [ "$?" != "0" ]; then
-		echo -e 
-		echo "ERROR: Not running on OL 8, aborting" 
-		exit 1
-	fi
 	echo "completed" 
 }
 
@@ -135,7 +141,7 @@ readini
 getbootvol
 #stopwindowsinstance
 #takebackup
-#detachbootvolfromwindows
+detachbootvolfromwindows
 #attachvoltolinux
 #fixvolume
 #detachbootvolfromlinux
