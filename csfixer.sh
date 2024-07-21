@@ -59,7 +59,7 @@ function readini() {
 	echo -e "completed" 
 	echo -e 
 	echo Windows Instance ID: ${WININSTANCE}
-	echo Fixer   Instance ID: ${FIXINSTANCE} 
+	#echo Fixer   Instance ID: ${FIXINSTANCE} 
 	echo -e
 	echo -e
 }
@@ -91,6 +91,16 @@ function getbootvol() {
 	#echo $bvID
 	echo "completed" 
 }
+function getfixerinfo() { 
+    
+    fixerInfo=$(curl -s -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/ 2>>csfixer.log)
+    if [ "$?" != "0" ]; then
+        echo "Error occured: " $fixerInfo
+        exit 1
+    fi
+    fixerID=$(echo "$fixerInfo" | jq -r '.id')
+    #echo "Fixer instance OCID: $fixerID"
+}
 function stopwindowsinstance() {
 	echo -en "Stopping Windows Instance..." 
 
@@ -106,44 +116,98 @@ function takebackup() {
 	bvbackup=$(oci bv boot-volume-backup create --boot-volume-id $bvID --wait-for-state AVAILABLE --display-name "backup-pre-cs-clean" 2>>csfixer.log)
 	if [ "$?" != "0" ]; then
 		echo "Error encountered: " $bvbackup
+        exit 1
 	fi
 	echo -e "completed"
 }
 function detachbootvolfromwindows() {
 	echo -en "Detach boot volume from windows instance..."
+    detachInfo=$(oci compute boot-volume-attachment detach --boot-volume-attachment-id $instanceID --force --wait-for-state DETACHED 2>>csfixer.log)
+    if [ "$?" != "0" ]; then
+        echo "Error encountered: " $detachInfo
+        exit 1
+    fi
 	echo -e "completed"
 }
-function attachvoltolinux() {
-	echo -en "Attach volume to linux instance..."
+
+function attachvoltofixer() {
+	echo -en "Attach volume to fixer instance..."
+    attachInfo=$(oci compute volume-attachment attach-paravirtualized-volume --instance-id $fixerID --volume-id $bvID --wait-for-state ATTACHED 2>>csfixer.log)    
+    if [ "$?" != "0" ]; then
+        echo "Error encountered: " $attachInfo
+        exit 1
+    fi
 	echo -e "completed"
 }
 function fixvolume() {
 	echo -en "Fixing volume..."
+    mkdir i
+    ntfs-3g.probe --readwrite /dev/sdb4 2>>csfixer.log
+    if [ "$?" != "0" ]; then
+        #windows volume is dirty - attempt fix
+        ntfsfix /dev/sdb4 2>>csfixer.log
+        if [ "$?" != "0" ]; then
+            echo "Error encountered, trying to fix ntfs volume.. aborting"
+            exit 1
+        fi
+    fi
+    
+    mount /dev/sdb4 i 
+    rm -rf i/Windows/System32/drivers/crowdstrike/c-00000291*.sys 2>>csfixer.log
+    rm -rf i/Windows/System32/drivers/crowdstrike/C-00000291*.sys 2>>csfixer.log
+    umount i
 	echo -e "completed" 
 }
-function detachbootvolfromlinux() {
+function detachbootvolfromfixer() {
 	echo -en "Detaching volume from linux instance..."
+    detachInfo=$(oci compute volume-attachment list --instance-id "$fixerID" 2>>csfixer.log)
+    if [ "$?" != "0" ]; then
+        echo "Error encountered: " $detachInfo
+    fi
+
+    #echo "Detach Info:" $detachInfo
+    #echo "BVID: " $bvID
+
+    attachID=$(echo "$detachInfo" | jq -r --arg bvID "$bvID" '.data[] | select(.["volume-id"] == $bvID and .["lifecycle-state"] == "ATTACHED") | .id')
+   
+    #echo "Attach ID" $attachID 
+    detachInfo=$(oci compute volume-attachment detach --volume-attachment-id $attachID --force --wait-for-state DETACHED 2>>csfixer.log)
+    if [ "$?" != "0" ]; then
+        echo "Error encountered: " $detachInfo
+        exit 1
+    fi  
 	echo -e "completed"
 }
 function attachvoltowindows() {
 	echo -en "Reattaching boot volume to windows instance..."
+    attachInfo=$(oci compute boot-volume-attachment attach --boot-volume-id $bvID --instance-id $instanceID --wait-for-state ATTACHED 2>>csfixer.log)
+    if [ "$?" != "0" ]; then
+        echo -e "Error encountered: " $attachInfo
+        exit 1
+    fi
 	echo -e "completed"
 }
 function startwindowsinstance() {
 	echo -en "Starting windows instance..."
+    startInfo=$(oci compute instance action --action START --instance-id $instanceID --wait-for-state RUNNING 2>>csfixer.log)
+    if [ "$?" != "0" ]; then
+        echo "Error encountered: " $startInfo
+        exit 1
+    fi
 	echo -e "completed"
 }
 
 
-#intro
-#prereqs
+intro
+prereqs
 readini
 getbootvol
-#stopwindowsinstance
-#takebackup
+getfixerinfo
+stopwindowsinstance
+takebackup
 detachbootvolfromwindows
-#attachvoltolinux
-#fixvolume
-#detachbootvolfromlinux
-#attachvoltowindows
-#startwindowsinstance
+attachvoltofixer
+fixvolume
+detachbootvolfromfixer
+attachvoltowindows
+startwindowsinstance
