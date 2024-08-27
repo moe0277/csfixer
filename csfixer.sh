@@ -17,7 +17,7 @@ function intro() {
 	echo -e "6. Restarts windows compute instances."
 	echo -e
 	echo -e "csfixer new run:" > csfixer.log
-	data &>csfixer.log
+	date &>csfixer.log
 }
 
 function prereqs() { 
